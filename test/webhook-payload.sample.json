@@ -1,0 +1,40 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "100123456789012",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "1555001234",
+              "phone_number_id": "test_phone_number_id"
+            },
+            "contacts": [
+              {
+                "profile": {
+                  "name": "Jane Doe"
+                },
+                "wa_id": "919876543210"
+              }
+            ],
+            "messages": [
+              {
+                "from": "919876543210",
+                "id": "wamid.HBgLOTE5ODc2NTQzMjEwFQIAEhgWM0VCMDEyMzQ1Njc4OUFCQ0RFRjAxMgA=",
+                "timestamp": "1732626000",
+                "type": "text",
+                "text": {
+                  "body": "1"
+                },
+                "group_id": "GROUP_ID_A"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
