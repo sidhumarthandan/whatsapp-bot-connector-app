@@ -12,9 +12,10 @@ export class StatementsController {
     @Query('senderName') senderName?: string,
     @Query('senderPhone') senderPhone?: string,
   ) {
-    const groupDetails = await this.whatsappService.getGroupDetailsForApi(groupId);
-    const data =
-      groupDetails || this.whatsappService.getStatementData('CLOSING_STATEMENT', groupId);
+    const groupDetails = groupId
+      ? await this.whatsappService.getGroupDetailsForApi(groupId)
+      : null;
+    const data = this.whatsappService.getStatementData('CLOSING_STATEMENT');
     return {
       success: true,
       queryType: 'CLOSING_STATEMENT',
@@ -35,9 +36,10 @@ export class StatementsController {
     @Query('senderName') senderName?: string,
     @Query('senderPhone') senderPhone?: string,
   ) {
-    const groupDetails = await this.whatsappService.getGroupDetailsForApi(groupId);
-    const data =
-      groupDetails || this.whatsappService.getStatementData('UNSETTLED_STATEMENT', groupId);
+    const groupDetails = groupId
+      ? await this.whatsappService.getGroupDetailsForApi(groupId)
+      : null;
+    const data = this.whatsappService.getStatementData('UNSETTLED_STATEMENT');
     return {
       success: true,
       queryType: 'UNSETTLED_STATEMENT',

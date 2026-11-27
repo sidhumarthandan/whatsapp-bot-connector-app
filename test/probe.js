@@ -168,15 +168,15 @@ async function runTests() {
     const res6b = await axios.post(`${baseURL}/webhook/whatsapp`, closingPayload);
     console.log('Result 6: WAHA @g.us =', res6a.data, ', Duplicate Meta =', res6b.data);
 
-    console.log('\n[TEST 7] Testing Statement Endpoints with Group Details (GET /statements/closing & /statements/unsettled)...');
+    console.log('\n[TEST 7] Testing Statement Endpoints (GET /statements/closing & /statements/unsettled)...');
     const [closingApi, unsettledApi] = await Promise.all([
       axios.get(`${baseURL}/statements/closing`, { params: { groupId: 'GROUP_ID_A' } }),
       axios.get(`${baseURL}/statements/unsettled`, { params: { groupId: 'GROUP_ID_B' } }),
     ]);
-    if (closingApi.data?.data?.groupId !== 'GROUP_ID_A') {
+    if (closingApi.data?.data?.status !== 'FULLY_CLOSED') {
       throw new Error('GET /statements/closing returned unexpected payload');
     }
-    if (unsettledApi.data?.data?.groupId !== 'GROUP_ID_B') {
+    if (unsettledApi.data?.data?.status !== 'PENDING_SETTLEMENT') {
       throw new Error('GET /statements/unsettled returned unexpected payload');
     }
     console.log('Result 7A (Closing):', closingApi.data);

@@ -263,7 +263,7 @@ export class WhatsappService {
       senderPhone: formattedUserPhone,
       groupId,
       groupName,
-      data: structuredResponse.groupDetails,
+      data: statementData,
     };
 
     this.logger.log('====================================================');
@@ -412,7 +412,7 @@ export class WhatsappService {
     senderPhone: string;
     groupId: string;
     groupName: string;
-    data: GroupQueryResponsePayload['groupDetails'];
+    data: StatementData;
   }): string {
     return [
       '✅ *Option Recorded!*',
