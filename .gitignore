@@ -5,6 +5,9 @@
 # Environment
 .env
 
+# WhatsApp Web Auth
+/auth_info_baileys/
+
 # Prisma
 /prisma/*.db
 /prisma/*.db-journal

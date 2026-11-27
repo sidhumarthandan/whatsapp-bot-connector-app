@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { GroupsService } from '../groups/groups.service';
+import { BaileysService } from './baileys.service';
 import {
   WhatsAppIncomingMessage,
   WhatsAppWebhookPayload,
@@ -21,6 +22,8 @@ export class WhatsappService {
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
     private readonly groupsService: GroupsService,
+    @Inject(forwardRef(() => BaileysService))
+    private readonly baileysService: BaileysService,
   ) {}
 
   /**
@@ -81,25 +84,35 @@ export class WhatsappService {
     }
 
     let selectedMenu = '';
-    if (messageText === '1') {
-      selectedMenu = 'MENU_1';
-    } else if (messageText === '2') {
-      selectedMenu = 'MENU_2';
+    const normalizedText = messageText?.toLowerCase() || '';
+
+    if (
+      normalizedText === '1' ||
+      normalizedText.includes('closing') ||
+      normalizedText.includes('clossing')
+    ) {
+      selectedMenu = 'CLOSING_STATEMENT';
+    } else if (
+      normalizedText === '2' ||
+      normalizedText.includes('unsettled')
+    ) {
+      selectedMenu = 'UNSETTLED_STATEMENT';
     }
 
     if (!selectedMenu) {
       this.logger.warn(
-        `Invalid or non-menu response from ${userPhone} in group ${groupId}: "${messageText}"`,
+        `Invalid query response from ${userPhone} in group ${groupId}: "${messageText}"`,
       );
       return;
     }
 
-    this.logger.log('========== GROUP INTERACTION ==========');
-    this.logger.log(`Group ID : ${groupId}`);
-    this.logger.log(`User     : ${userPhone}`);
-    this.logger.log(`Menu     : ${selectedMenu}`);
-    this.logger.log(`Msg ID   : ${messageId}`);
-    this.logger.log('=======================================');
+    this.logger.log('====================================================');
+    this.logger.log('📢 NEW WHATSAPP GROUP QUERY DETECTED');
+    this.logger.log(`📌 Group ID    : ${groupId}`);
+    this.logger.log(`👤 User Phone  : ${userPhone}`);
+    this.logger.log(`📄 Query Type  : ${selectedMenu}`);
+    this.logger.log(`🆔 Message ID  : ${messageId}`);
+    this.logger.log('====================================================');
 
     // Maintain in-memory dummy group, participant, and interaction history
     await this.groupsService.upsertGroup(groupId);
@@ -111,32 +124,74 @@ export class WhatsappService {
       messageId,
     );
 
-    // Send automatic reply back to group
+    // Dummy JSON Statements Data
+    const dummyStatements = {
+      CLOSING_STATEMENT: {
+        statementType: 'Closing Statement',
+        accountNumber: 'ACC-8839201',
+        period: 'November 2026',
+        totalInvoiced: '₹1,50,000',
+        totalSettled: '₹1,50,000',
+        closingBalance: '₹0.00',
+        status: 'FULLY_CLOSED',
+        generatedAt: new Date().toISOString(),
+      },
+      UNSETTLED_STATEMENT: {
+        statementType: 'Unsettled Statement',
+        accountNumber: 'ACC-8839201',
+        period: 'November 2026',
+        pendingInvoicesCount: 3,
+        unsettledAmount: '₹42,350',
+        nextDueDate: '05-Dec-2026',
+        status: 'PENDING_SETTLEMENT',
+        generatedAt: new Date().toISOString(),
+      },
+    };
+
+    const statementData = dummyStatements[selectedMenu];
+    this.logger.log(`📊 Generated Dummy JSON Response for ${selectedMenu}:`);
+    this.logger.log(JSON.stringify(statementData, null, 2));
+
+    // Format human-friendly WhatsApp message
     let replyText = '';
-    if (selectedMenu === 'MENU_1') {
-      replyText = 'You selected Menu 1. Thank you!';
-    } else if (selectedMenu === 'MENU_2') {
-      replyText = 'You selected Menu 2. Thank you!';
+    if (selectedMenu === 'CLOSING_STATEMENT') {
+      replyText =
+        `📄 *Closing Statement Details*\n` +
+        `• Account: ${statementData.accountNumber}\n` +
+        `• Period: ${statementData.period}\n` +
+        `• Total Settled: ${statementData.totalSettled}\n` +
+        `• Closing Balance: ${statementData.closingBalance}\n` +
+        `• Status: ✅ ${statementData.status}`;
+    } else {
+      replyText =
+        `⚠️ *Unsettled Statement Details*\n` +
+        `• Account: ${statementData.accountNumber}\n` +
+        `• Pending Invoices: ${statementData.pendingInvoicesCount}\n` +
+        `• Unsettled Amount: ${statementData.unsettledAmount}\n` +
+        `• Due Date: ${statementData.nextDueDate}\n` +
+        `• Status: ⏳ ${statementData.status}`;
     }
 
-    if (replyText) {
-      try {
-        await this.sendGroupMessage(groupId, replyText, phoneNumberId);
-      } catch (error) {
-        this.logger.warn(
-          `Auto-reply attempt logged for group ${groupId}: ${error.message}`,
-        );
-      }
+    // Auto-reply to WhatsApp group with statement details
+    try {
+      await this.sendGroupMessage(groupId, replyText, phoneNumberId);
+    } catch (error) {
+      this.logger.warn(
+        `Auto-reply attempt logged for group ${groupId}: ${error.message}`,
+      );
     }
 
-    // Forward event to Make.com webhook if configured
+    // Forward event + dummy JSON statement to Make.com Webhook
     await this.notifyMakeWebhook({
-      event: 'WHATSAPP_MENU_SELECTED',
+      event: 'WHATSAPP_STATEMENT_REQUESTED',
       groupId,
       userId: userPhone,
       menuId: selectedMenu,
       messageId,
       timestamp: new Date().toISOString(),
+      extra: {
+        statementData,
+      },
     });
   }
 
@@ -148,6 +203,22 @@ export class WhatsappService {
     message: string,
     overridePhoneNumberId?: string,
   ): Promise<SendMessageResponse | any> {
+    // If Baileys is connected and destination is a WhatsApp Web group JID
+    if (groupId.endsWith('@g.us') && this.baileysService?.isConnected) {
+      try {
+        const sendResult = await this.baileysService.sendTextMessage(groupId, message);
+        this.logger.log(`Message sent directly via WhatsApp Web to group: ${groupId}`);
+        return {
+          platform: 'whatsapp_web_baileys',
+          sentToGroup: groupId,
+          messageId: sendResult?.key?.id,
+          success: true,
+        };
+      } catch (err) {
+        this.logger.error(`Error sending via Baileys to ${groupId}: ${err.message}`);
+      }
+    }
+
     const phoneNumberId =
       overridePhoneNumberId ||
       this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID');

@@ -67,6 +67,7 @@ export interface MakeWebhookPayload {
   groupId: string;
   userId: string;
   menuId: string;
+  option?: string;
   messageId: string;
   timestamp: string;
   extra?: Record<string, any>;

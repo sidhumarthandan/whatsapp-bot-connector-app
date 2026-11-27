@@ -36,7 +36,7 @@ async function runTests() {
     console.log('Result 2: Total Groups =', groupsRes.data.total);
     console.log('Groups List:', groupsRes.data.data.map(g => `${g.whatsappGroupId} (${g.groupName})`));
 
-    console.log('\n[TEST 3] Simulating Incoming WhatsApp Message with Menu Selection (POST /webhook/whatsapp)...');
+    console.log('\n[TEST 3] Simulating Incoming Message: "Closing statement" in GROUP_ID_A...');
     const samplePayload = {
       object: 'whatsapp_business_account',
       entry: [
@@ -54,11 +54,11 @@ async function runTests() {
                 messages: [
                   {
                     from: '919876543210',
-                    id: 'wamid.PROBE_MSG_001',
+                    id: 'wamid.STMT_MSG_001',
                     timestamp: '1732626000',
                     type: 'text',
                     text: {
-                      body: '1',
+                      body: 'Closing statement',
                     },
                     group_id: 'GROUP_ID_A',
                   },
@@ -72,6 +72,43 @@ async function runTests() {
 
     const webhookRes = await axios.post(`${baseURL}/webhook/whatsapp`, samplePayload);
     console.log('Result 3: Webhook Receiver Status =', webhookRes.status, webhookRes.data);
+
+    console.log('\n[TEST 4] Simulating Incoming Message: "2" (Unsettled statement) in GROUP_ID_B...');
+    const samplePayloadB = {
+      object: 'whatsapp_business_account',
+      entry: [
+        {
+          id: 'test_waba_id',
+          changes: [
+            {
+              field: 'messages',
+              value: {
+                messaging_product: 'whatsapp',
+                metadata: {
+                  display_phone_number: '1555001234',
+                  phone_number_id: 'test_phone_number_id',
+                },
+                messages: [
+                  {
+                    from: '919123456780',
+                    id: 'wamid.STMT_MSG_002',
+                    timestamp: '1732626010',
+                    type: 'text',
+                    text: {
+                      body: '2',
+                    },
+                    group_id: 'GROUP_ID_B',
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const webhookResB = await axios.post(`${baseURL}/webhook/whatsapp`, samplePayloadB);
+    console.log('Result 4: Webhook Receiver Status B =', webhookResB.status, webhookResB.data);
 
     console.log('\n[TEST 4] Verifying Recorded Menu Interaction in Group A (GET /groups/GROUP_ID_A/interactions)...');
     const interactionsRes = await axios.get(`${baseURL}/groups/GROUP_ID_A/interactions`);
