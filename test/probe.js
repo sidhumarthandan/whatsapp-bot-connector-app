@@ -68,7 +68,30 @@ async function runTests() {
     const groupsRes = await axios.get(`${baseURL}/groups`);
     console.log('Result 2: Total Groups =', groupsRes.data.total);
 
-    console.log('\n[TEST 3] Simulating Closing Statement Query in Group A (POST /webhook/whatsapp)...');
+    console.log('\n[TEST 3] Verifying Casual "1" Without Menu Is Ignored, Then Menu + Closing Statement in Group A...');
+    await axios.post(
+      `${baseURL}/webhook/whatsapp`,
+      buildMetaPayload({
+        groupId: 'GROUP_ID_A',
+        from: '919876543210',
+        messageId: 'wamid.CASUAL_IGNORED_001',
+        text: '1',
+      }),
+    );
+    const beforeMenuInt = await axios.get(`${baseURL}/groups/GROUP_ID_A/interactions`);
+    if (beforeMenuInt.data.data.length !== 0) {
+      throw new Error('Casual "1" before opening menu should have been ignored');
+    }
+
+    await axios.post(
+      `${baseURL}/webhook/whatsapp`,
+      buildMetaPayload({
+        groupId: 'GROUP_ID_A',
+        from: '919876543210',
+        messageId: 'wamid.MENU_OPEN_A',
+        text: 'menu',
+      }),
+    );
     const closingPayload = buildMetaPayload({
       groupId: 'GROUP_ID_A',
       from: '919876543210',
@@ -78,7 +101,16 @@ async function runTests() {
     const res3 = await axios.post(`${baseURL}/webhook/whatsapp`, closingPayload);
     console.log('Result 3:', res3.status, res3.data);
 
-    console.log('\n[TEST 4] Simulating Unsettled Statement Query in Group B (POST /webhook/whatsapp)...');
+    console.log('\n[TEST 4] Simulating Menu ("hi") + Unsettled Statement ("2") in Group B...');
+    await axios.post(
+      `${baseURL}/webhook/whatsapp`,
+      buildMetaPayload({
+        groupId: 'GROUP_ID_B',
+        from: '919123456780',
+        messageId: 'wamid.MENU_OPEN_B',
+        text: 'hi',
+      }),
+    );
     const unsettledPayload = buildMetaPayload({
       groupId: 'GROUP_ID_B',
       from: '919123456780',
@@ -103,7 +135,19 @@ async function runTests() {
       throw new Error('UNSETTLED_STATEMENT was not recorded for GROUP_ID_B');
     }
 
-    console.log('\n[TEST 6] Testing WAHA Group Webhook (@g.us) + Idempotency (POST /webhook/waha)...');
+    console.log('\n[TEST 6] Testing WAHA Group Webhook (@g.us) Menu + Selection + Idempotency (POST /webhook/waha)...');
+    await axios.post(`${baseURL}/webhook/waha`, {
+      event: 'message',
+      session: 'default',
+      engine: 'NOWEB',
+      payload: {
+        id: 'waha_probe_menu_001',
+        from: '120363000000000001@g.us',
+        participant: '919876543210@c.us',
+        body: 'menu',
+        fromMe: false,
+      },
+    });
     const wahaPayload = {
       event: 'message',
       session: 'default',

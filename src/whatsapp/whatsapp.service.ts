@@ -31,12 +31,16 @@ const MENU_TRIGGER_WORDS = new Set([
   'help',
 ]);
 
+const MENU_SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
 
   // In-memory set to ensure idempotency within process runtime
   private readonly processedMessageIds = new Set<string>();
+  // Tracks groups where the bot menu was explicitly opened (groupId -> expiry timestamp)
+  private readonly activeGroupMenus = new Map<string, number>();
 
   constructor(
     private readonly configService: ConfigService,
@@ -164,6 +168,7 @@ export class WhatsappService {
 
     if (MENU_TRIGGER_WORDS.has(normalized)) {
       this.logger.log(`Menu prompt requested by ${userPhone} in group ${groupId}`);
+      this.activeGroupMenus.set(groupId, Date.now() + MENU_SESSION_TTL_MS);
       await this.groupsService.upsertGroup(groupId);
       await this.groupsService.upsertParticipant(groupId, userPhone);
       await this.safeSendGroupMessage(groupId, MENU_PROMPT_TEXT, phoneNumberId);
@@ -172,8 +177,15 @@ export class WhatsappService {
 
     const selectedMenu = this.parseMenuSelection(normalized);
     if (!selectedMenu) {
-      this.logger.warn(
+      this.logger.debug(
         `Non-menu message from ${userPhone} in group ${groupId}: "${messageText}"`,
+      );
+      return;
+    }
+
+    if (!this.consumeActiveMenu(groupId)) {
+      this.logger.debug(
+        `Ignored "${messageText}" in group ${groupId} — menu not active (send "menu" or "hi" first).`,
       );
       return;
     }
@@ -284,6 +296,15 @@ export class WhatsappService {
         statementApiResponse,
       },
     });
+  }
+
+  private consumeActiveMenu(groupId: string): boolean {
+    const expiresAt = this.activeGroupMenus.get(groupId);
+    if (!expiresAt) {
+      return false;
+    }
+    this.activeGroupMenus.delete(groupId);
+    return Date.now() <= expiresAt;
   }
 
   private parseMenuSelection(normalizedText: string): StatementMenuId | null {
