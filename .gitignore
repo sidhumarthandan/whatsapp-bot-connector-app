@@ -5,6 +5,9 @@
 # Environment
 .env
 
+# WAHA persistent sessions
+waha-sessions/
+
 # Prisma
 /prisma/*.db
 /prisma/*.db-journal
